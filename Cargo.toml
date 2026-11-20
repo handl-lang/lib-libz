@@ -2,9 +2,11 @@
 name = "handl-lib-libz"
 version = "0.1.0"
 edition = "2024"
-description = "libz: sdkgen-generated zlib FFI bindings (port + linux-x86_64 adapters) — ADR-0128 split."
-license = "MIT OR Apache-2.0"
+description = "libz: sdkgen-generated zlib FFI bindings (port + linux-x86_64 adapters)."
+license = "MIT"
 repository = "https://github.com/handl-lang/lib-libz"
+homepage = "https://github.com/handl-lang/lib-libz"
+readme = "README.md"
 
 # Const-only: pure handl.
 [dependencies]
