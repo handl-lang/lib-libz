@@ -8,10 +8,10 @@
 #
 # This repo is specs-driven: there is no src/*.hnl — the gate is
 # scripts/hnl-gate.sh, which regenerates the port/adapter pair under
-# handl-packages/generated/ from specs/libz.sdkgen.yaml (`hnl sdkgen c
+# handl-packages/generated/ from specs/libz.sdkgen.yaml (`hnl codegen c
 # zlib.h`) and then runs the canonical typecheck/lint/test
 # pass over src/ + generated/. The canonical handl-gate.node.yml
-# fragment cannot express the sdkgen regen leg (and would vacuous-pass
+# fragment cannot express the codegen regen leg (and would vacuous-pass
 # with no .hnl under src/), so this campaign ports ci.sh + hnl-gate.sh
 # directly: the ci.sh skeleton guard (skip honestly when neither
 # src/*.hnl nor specs/ files exist) followed by `bash
@@ -19,11 +19,11 @@
 # scripts/.
 #
 # Toolchain: GATE_HNL / GATE_HNL_EXT_DIR default to the dogfood
-# release build. NOTE: sdkgen is an extension
-# (libhnl_ext_sdkgen.so) that the dogfood release dir does not
+# release build. NOTE: codegen is an extension
+# (libhnl_ext_codegen.so) that the dogfood release dir does not
 # currently stage — point GATE_HNL_EXT_DIR at a directory containing
-# it (the dogfood release .so's plus the ext-sdkgen build) until the
-# dogfood bundle ships sdkgen, or the regen leg fails honestly.
+# it (the dogfood release .so's plus the ext-codegen build) until the
+# dogfood bundle ships codegen, or the regen leg fails honestly.
 #
 # Verdict: .ci-result.json `.conclusion` == "success".
 name: gate-lib-libz-specs

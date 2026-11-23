@@ -37,9 +37,9 @@ resolve_header() {
 # loader cannot find it); a missing system header skips that module's
 # regen with a warning rather than failing the whole gate.
 if [ -f "$SPEC_DIR/libz.sdkgen.yaml" ]; then
-  echo "== hnl sdkgen c zlib.h --output $GEN_DIR/libz =="
+  echo "== hnl codegen c zlib.h --output $GEN_DIR/libz =="
   if h=$(resolve_header zlib.h); then
-    "$HNL" sdkgen c "$h" --output "$GEN_DIR/libz" --config "$SPEC_DIR/libz.sdkgen.yaml"
+    "$HNL" codegen c "$h" --output "$GEN_DIR/libz" --config "$SPEC_DIR/libz.sdkgen.yaml"
   else
     echo "   warning: zlib.h not found — skipping libz regen (install zlib headers)" >&2
   fi

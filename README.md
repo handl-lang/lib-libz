@@ -1,6 +1,6 @@
 # lib-libz
 
-sdkgen-generated zlib FFI bindings — generic ports plus the
+codegen-generated zlib FFI bindings — generic ports plus the
 `c-linux-x86_64` adapters, emitted under `handl-packages/generated/` (a
 gitignored build artifact).
 
@@ -16,7 +16,7 @@ pkg.hnl     package manifest — modules, deps, description, license
 ## Regenerate
 
 ```bash
-hnl sdkgen c /usr/include/zlib.h \
+hnl codegen c /usr/include/zlib.h \
   --output handl-packages/generated/libz \
   --config specs/libz.sdkgen.yaml
 ```
