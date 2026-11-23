@@ -1,0 +1,129 @@
+# workflows/gate.yaml — per-push gate for handl-lang/lib-libz.
+#
+# Replaces ci.sh as the bupha/peregrin gate (ci.sh stays in the tree
+# for reference until the runner flips). Invoke:
+#
+#   GATE_REPO="$PWD" GATE_RESULTS="$PWD/.gate-results.jsonl" \
+#     peregrin campaign run workflows/gate.yaml --result .ci-result.json
+#
+# This repo is specs-driven: there is no src/*.hnl — the gate is
+# scripts/hnl-gate.sh, which regenerates the port/adapter pair under
+# handl-packages/generated/ from specs/libz.sdkgen.yaml (`hnl sdkgen c
+# zlib.h`) and then runs the canonical typecheck/lint/test
+# pass over src/ + generated/. The canonical handl-gate.node.yml
+# fragment cannot express the sdkgen regen leg (and would vacuous-pass
+# with no .hnl under src/), so this campaign ports ci.sh + hnl-gate.sh
+# directly: the ci.sh skeleton guard (skip honestly when neither
+# src/*.hnl nor specs/ files exist) followed by `bash
+# scripts/hnl-gate.sh` — the repo's own gate script, kept under
+# scripts/.
+#
+# Toolchain: GATE_HNL / GATE_HNL_EXT_DIR default to the dogfood
+# release build. NOTE: sdkgen is an extension
+# (libhnl_ext_sdkgen.so) that the dogfood release dir does not
+# currently stage — point GATE_HNL_EXT_DIR at a directory containing
+# it (the dogfood release .so's plus the ext-sdkgen build) until the
+# dogfood bundle ships sdkgen, or the regen leg fails honestly.
+#
+# Verdict: .ci-result.json `.conclusion` == "success".
+name: gate-lib-libz-specs
+
+result:
+  - event: gate.pass
+    conclusion: success
+  - event: gate.fail
+    conclusion: failure
+  - event: gate.failed
+    conclusion: failure
+  - event: gate.init.failed
+    conclusion: failure
+  - event: gate.hnl.failed
+    conclusion: failure
+
+capabilities:
+  env:
+    - GATE_REPO
+    - GATE_RESULTS
+    - GATE_HNL
+    - GATE_HNL_EXT_DIR
+
+nodes:
+  # --- init: validate inputs, fresh results file --------------------
+  - id: gate.init
+    driver: shell
+    on: [start]
+    emits: [gate.due, gate.init.failed]
+    params:
+      cmd: >-
+        set -u;
+        REPO="${config.gate.repo:-${env("GATE_REPO","")}}";
+        [ -n "$REPO" ] || { echo "gate.repo is required — set GATE_REPO or config.gate.repo to an absolute checkout path"; exit 1; };
+        [ -d "$REPO" ] || { echo "no such directory: $REPO"; exit 1; };
+        RES="${config.gate.results:-${env("GATE_RESULTS","$HOME/.local/share/handl-gates/lib-libz.results.jsonl")}}";
+        mkdir -p "$(dirname "$RES")";
+        : > "$RES";
+        echo "gate-lib-libz: repo=$REPO results=$RES"
+      timeout: 60
+      emit:
+        "0": gate.due
+        default: gate.init.failed
+
+  # --- gate: ci.sh's skeleton guard + scripts/hnl-gate.sh ----------
+  - id: gate.hnl
+    driver: shell
+    on: [gate.due]
+    emits: [gate.done, gate.failed]
+    params:
+      repo: '${config.gate.repo:-${env("GATE_REPO","")}}'
+      results: '${config.gate.results:-${env("GATE_RESULTS","$HOME/.local/share/handl-gates/lib-libz.results.jsonl")}}'
+      hnl: '${config.gate.hnl:-${env("GATE_HNL","$HOME/GitHub/handl-lang/.ci-target/dogfood/release/hnl")}}'
+      hnl_ext_dir: '${config.gate.hnl_ext_dir:-${env("GATE_HNL_EXT_DIR","$HOME/GitHub/handl-lang/.ci-target/dogfood/release")}}'
+      timeout: 1800
+      cmd: |-
+        set -uo pipefail
+        REPO="${params.repo}"
+        RESULTS="${params.results}"
+        START=$(date +%s)
+        cd "$REPO" && REPO="$(pwd)" || { echo "no such directory: ${params.repo}"; exit 1; }
+        export HNL="${params.hnl}" HANDL_EXT_DIR="${params.hnl_ext_dir}"
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
+        rc=0
+        # ci.sh skeleton guard, ported verbatim: a repo with no
+        # src/*.hnl AND no specs/ files skips honestly.
+        if ! find src -name '*.hnl' 2>/dev/null | grep -q . && \
+           ! find specs -type f 2>/dev/null | grep -q .; then
+          echo "no .hnl sources under src/ and no specs/ - gate skipped"
+        elif [ ! -f scripts/hnl-gate.sh ]; then
+          echo "scripts/hnl-gate.sh missing — the specs gate has no entry point" >&2
+          rc=1
+        else
+          bash scripts/hnl-gate.sh
+          rc=$?
+        fi
+        if [ -n "$RESULTS" ]; then
+          esc=$(printf '%s' "$REPO" | sed 's/\\/\\\\/g; s/"/\\"/g')
+          printf '{"family":"handl","repo":"%s","rc":%s,"secs":%s}\n' "$esc" "$rc" "$(( $(date +%s) - START ))" >> "$RESULTS" 2>/dev/null || true
+        fi
+        exit $rc
+      emit:
+        "0": gate.done
+        default: gate.failed
+
+  # --- report: terminal verdict from the results record -------------
+  - id: gate.report
+    driver: shell
+    on: [gate.done, gate.failed]
+    emits: [gate.pass, gate.fail]
+    params:
+      cmd: >-
+        set -u;
+        F="${config.gate.results:-${env("GATE_RESULTS","$HOME/.local/share/handl-gates/lib-libz.results.jsonl")}}";
+        [ -s "$F" ] || { echo "no results record — gate produced nothing"; exit 1; };
+        line=$(tail -n 1 "$F");
+        rc=$(printf '%s' "$line" | sed -n 's/.*"rc":\([0-9][0-9]*\).*/\1/p');
+        echo "gate-lib-libz verdict: $line";
+        [ "${rc:-1}" = "0" ]
+      timeout: 60
+      emit:
+        "0": gate.pass
+        default: gate.fail
